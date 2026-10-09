@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Chatbot</title>
+<style>
+  :root { --bg:#eef2f6; --panel:#ffffff; --ink:#1b2430; --muted:#6b7686; --me:#1f4e8c; --bot:#e6ebf2; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12161c; --panel:#1b2129; --ink:#e8edf3; --muted:#8a95a5; --me:#3b7ddd; --bot:#262e38; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); height:100vh; display:flex; justify-content:center; }
+  .chat { width:100%; max-width:720px; display:flex; flex-direction:column; background:var(--panel); }
+  header { padding:16px 20px; border-bottom:1px solid var(--bot); font-weight:600; }
+  #log { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:80%; padding:10px 14px; border-radius:14px; line-height:1.45; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:var(--me); color:#fff; }
+  .bot { align-self:flex-start; background:var(--bot); }
+  .empty { color:var(--muted); margin:auto; text-align:center; }
+  form { display:flex; gap:8px; padding:14px; border-top:1px solid var(--bot); }
+  input { flex:1; padding:12px 14px; border-radius:10px; border:1px solid var(--bot); background:var(--bg); color:var(--ink); font-size:1rem; }
+  button { padding:12px 20px; border:0; border-radius:10px; background:var(--me); color:#fff; font-size:1rem; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  :focus-visible { outline:2px solid var(--me); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="chat">
+  <header>AI Chatbot</header>
+  <div id="log"><div class="empty" id="empty">Ask me anything to get started.</div></div>
+  <form id="form">
+    <input id="input" placeholder="Type your message" autocomplete="off" required>
+    <button id="send">Send</button>
+  </form>
+</div>
+<script>
+  const log = document.getElementById("log");
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const history = [];
+
+  function add(role, text) {
+    const empty = document.getElementById("empty");
+    if (empty) empty.remove();
+    const d = document.createElement("div");
+    d.className = "msg " + (role === "user" ? "me" : "bot");
+    d.textContent = text;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    add("user", text);
+    history.push({ role: "user", content: text });
+    send.disabled = true;
+    const pending = add("assistant", "Thinking...");
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      pending.textContent = data.reply;
+      history.push({ role: "assistant", content: data.reply });
+    } catch (err) {
+      pending.textContent = "Something went wrong: " + err.message;
+      history.pop();
+    }
+    send.disabled = false;
+    input.focus();
+  });
+</script>
+</body>
+</html>
